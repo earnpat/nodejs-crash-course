@@ -1,40 +1,62 @@
-const { calVat, sayHello } = require('./utils')
-
-sayHello()
-
-const vat = calVat(100, 7)
-console.log(vat);
-
-console.log(__filename);
-console.log(__dirname);
-
-// Path
+const http = require('http')
 const path = require('path')
-console.log(path.basename(__filename));
-console.log(path.dirname(__filename));
-console.log(path.extname(__filename));
-console.log(path.parse(__filename));
-console.log(path.join(__dirname, 'utils.js'));
-
-// File
 const fs = require('fs')
-// fs.writeFileSync(path.join(__dirname, 'data.txt'), 'Hello') // small file
-// fs.writeFile(path.join(__dirname, 'data.txt'), 'Hello', () => console.log('Finished writing file.')) // async
-console.log(fs.readFileSync(path.join(__dirname, 'data.txt'), 'utf-8'));
+const moment = require('moment')
 
-// OS
-const os = require('os')
-console.log(os.cpus());
-console.log(os.homedir());
-console.log(os.uptime());
+function getPage(page) {
+  const filePath = path.join(__dirname, page)
+  return fs.readFileSync(filePath)
+}
 
-// Events
-const events = require('events')
-const EventEmitter = events.EventEmitter
-const connect = new EventEmitter()
+function handleFiles(req, res) {
+  const fileType = path.extname(req.url) || '.html'
+  if (fileType === '.html') {
+    res.setHeader('Content-Type', 'text/html')
+    res.writeHead(200)
 
-connect.on('online', () => {
-  console.log('A new user has connected.');
-})
+    if (req.url === '/') res.write(getPage('index.html'))
+    else res.write(getPage(`${req.url}.html`))
 
-connect.emit('online')
+  } else if (fileType === '.css') {
+    res.setHeader('Content-Type', 'text/css')
+    res.writeHead(200)
+    res.write(getPage(req.url))
+  } else res.writeHead(404)
+  res.end()
+}
+
+function getData(url) {
+  let data
+  if (url === '/apis/users') {
+    data = [{ name: 'Me' }, { name: 'You' }]
+  } else if (url === '/apis/posts') {
+    data = [
+      {
+        title: 'A',
+        publishedDate: moment().startOf('day').fromNow()
+      },
+      {
+        title: 'B',
+        publishedDate: moment().set('month', 1).startOf('day').fromNow()
+      },
+    ]
+  }
+
+  return data
+}
+
+function handleAPIs(req, res) {
+  let data = getData(req.url)
+
+  if (data) {
+    res.setHeader('Content-Type', 'application/json')
+    res.write(JSON.stringify(data))
+  } else res.writeHead(404)
+
+  res.end()
+}
+
+http.createServer((req, res) => {
+  if (req.url.startsWith('/apis/')) handleAPIs(req, res)
+  else handleFiles(req, res)
+}).listen(3000)
